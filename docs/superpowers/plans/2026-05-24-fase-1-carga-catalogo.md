@@ -124,6 +124,12 @@ create policy "fotografo gestiona sus sessions" on public.sessions for all
   using (photographer_id = auth.uid()) with check (photographer_id = auth.uid());
 create policy "fotografo gestiona sus fotos" on public.photos for all
   using (photographer_id = auth.uid()) with check (photographer_id = auth.uid());
+
+-- Watermark del fotógrafo (lo usa el pipeline processPhoto de esta fase).
+alter table public.profiles
+  add column watermark_path     text,
+  add column watermark_position text default 'bottom-right',
+  add column watermark_opacity  numeric default 0.6;
 ```
 
 - [ ] **Step 2: Escribir la migración de Storage**
