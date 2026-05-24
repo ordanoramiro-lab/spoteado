@@ -92,6 +92,19 @@ export default defineConfig({
 ```ts
 // vitest.setup.ts
 import '@testing-library/jest-dom/vitest'
+
+// Env dummy para que los módulos que importan `lib/env` (que valida al cargar)
+// no crasheen en los tests. Los tests de parseEnv pasan sus propios fixtures.
+process.env.NEXT_PUBLIC_SUPABASE_URL ??= 'https://test.supabase.co'
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'test-anon'
+process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service'
+process.env.JINA_API_KEY ??= 'test-jina'
+process.env.QDRANT_URL ??= 'https://test.qdrant.io'
+process.env.QDRANT_API_KEY ??= 'test-qdrant'
+process.env.MP_ACCESS_TOKEN ??= 'test-mp'
+process.env.MP_WEBHOOK_SECRET ??= 'test-mp-secret'
+process.env.NEXT_PUBLIC_SITE_URL ??= 'http://localhost:3000'
+process.env.CRON_SECRET ??= 'test-cron'
 ```
 
 - [ ] **Step 4: Agregar scripts a package.json**
