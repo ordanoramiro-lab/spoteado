@@ -27,12 +27,33 @@ function qdrant() {
   return client
 }
 
+// Qdrant exige un índice de payload en cada campo usado para filtrar en la búsqueda.
+const PAYLOAD_INDEXES: { field: string; schema: 'keyword' | 'integer' }[] = [
+  { field: 'status', schema: 'keyword' },
+  { field: 'beach_slug', schema: 'keyword' },
+  { field: 'time_block', schema: 'keyword' },
+  { field: 'tags', schema: 'keyword' },
+  { field: 'session_id', schema: 'keyword' },
+  { field: 'captured_at', schema: 'integer' },
+]
+
 export async function ensureCollection() {
   const exists = await qdrant().collectionExists(PHOTOS_COLLECTION)
   if (!exists.exists) {
     await qdrant().createCollection(PHOTOS_COLLECTION, {
       vectors: { size: EMBEDDING_DIM, distance: 'Cosine' },
     })
+  }
+  // Índices de payload (idempotente: si ya existe, Qdrant lo ignora/recrea sin romper).
+  for (const { field, schema } of PAYLOAD_INDEXES) {
+    try {
+      await qdrant().createPayloadIndex(PHOTOS_COLLECTION, {
+        field_name: field,
+        field_schema: schema,
+      })
+    } catch {
+      // índice ya existente → continuar
+    }
   }
 }
 
