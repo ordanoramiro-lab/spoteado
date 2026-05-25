@@ -65,3 +65,7 @@ export async function searchPhotos(vector: number[], filter: SearchFilter, limit
   const res = await qdrant().search(PHOTOS_COLLECTION, { vector, filter: { must }, limit })
   return res.map((r) => ({ id: String(r.id), score: r.score }))
 }
+
+export async function setPhotoTagsPayload(photoId: string, tags: string[]) {
+  await qdrant().setPayload(PHOTOS_COLLECTION, { payload: { tags }, points: [photoId] })
+}
