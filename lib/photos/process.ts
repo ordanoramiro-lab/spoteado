@@ -13,11 +13,14 @@ export async function processPhoto(deps: ProcessDeps, photo: PhotoRow): Promise<
     original = await deps.downloadOriginal(photo.original_path)
     preview = await deps.makePreview(original)
     thumb = await deps.makeThumb(original)
+    const { width, height } = await deps.readDimensions(original)
     await deps.uploadPublic(`${photo.id}/preview.jpg`, preview)
     await deps.uploadPublic(`${photo.id}/thumb.jpg`, thumb)
     await deps.updatePhoto({
       preview_path: `${photo.id}/preview.jpg`,
       thumb_path: `${photo.id}/thumb.jpg`,
+      width,
+      height,
       status: 'ready',
     })
   } catch {

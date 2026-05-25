@@ -10,6 +10,7 @@ function makeDeps(over: Partial<ProcessDeps> = {}): ProcessDeps {
     indexVector: vi.fn(async () => {}),
     makePreview: vi.fn(async () => Buffer.from('prev')),
     makeThumb: vi.fn(async () => Buffer.from('thumb')),
+    readDimensions: vi.fn(async () => ({ width: 800, height: 600 })),
     updatePhoto: vi.fn(async () => {}),
     ...over,
   }

@@ -1,12 +1,19 @@
 import { type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUser } from '@/lib/auth/dal'
 import { getEmbedder } from '@/lib/embeddings'
-import { makeThumbnail, watermarkPreview } from '@/lib/images'
+import { imageDimensions, makeThumbnail, watermarkPreview } from '@/lib/images'
 import { upsertPhoto } from '@/lib/vectors'
 import { processPhoto } from '@/lib/photos/process'
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params
+
+  // Authz: solo un usuario logueado puede disparar el procesamiento, y solo de SUS fotos.
+  // (El endpoint usa el admin client que saltea RLS, así que la verificación es manual.)
+  const user = await getUser()
+  if (!user) return Response.json({ error: 'unauthorized' }, { status: 401 })
+
   const admin = createAdminClient()
 
   const { data: photo } = await admin
@@ -15,6 +22,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     .eq('id', id)
     .single()
   if (!photo) return Response.json({ error: 'not found' }, { status: 404 })
+  if (photo.photographer_id !== user.id) return Response.json({ error: 'forbidden' }, { status: 403 })
 
   const { data: prof } = await admin
     .from('profiles')
@@ -38,6 +46,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
           opacity: prof?.watermark_opacity ?? 0.6,
         }),
       makeThumb: (orig: Buffer) => makeThumbnail(orig),
+      readDimensions: (orig: Buffer) => imageDimensions(orig),
       embedImage: (img: Buffer) => getEmbedder().embedImage(img),
       indexVector: (vector: number[]) =>
         upsertPhoto(vector, {

@@ -3,6 +3,11 @@ import sharp from 'sharp'
 const PREVIEW_MAX = 1400
 const THUMB_MAX = 600
 
+export async function imageDimensions(original: Buffer): Promise<{ width: number | null; height: number | null }> {
+  const meta = await sharp(original).metadata()
+  return { width: meta.width ?? null, height: meta.height ?? null }
+}
+
 export async function makeThumbnail(original: Buffer): Promise<Buffer> {
   return sharp(original)
     .resize(THUMB_MAX, THUMB_MAX, { fit: 'inside', withoutEnlargement: true })
