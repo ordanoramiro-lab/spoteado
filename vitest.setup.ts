@@ -1,4 +1,18 @@
 import '@testing-library/jest-dom/vitest'
+import { vi } from 'vitest'
+import React from 'react'
+
+// Mock next/image to avoid URL validation errors in jsdom
+vi.mock('next/image', () => ({
+  default: ({ src, alt, width, height, className }: { src: string; alt: string; width?: number; height?: number; className?: string }) =>
+    React.createElement('img', { src, alt, width, height, className }),
+}))
+
+// Mock next/link to render a plain anchor in jsdom
+vi.mock('next/link', () => ({
+  default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) =>
+    React.createElement('a', { href, className }, children),
+}))
 
 // Env dummy para que los módulos que importan `lib/env` (que valida al cargar)
 // no crasheen en los tests. Los tests de parseEnv pasan sus propios fixtures.
