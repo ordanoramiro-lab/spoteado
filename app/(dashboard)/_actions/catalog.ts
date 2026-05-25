@@ -20,3 +20,21 @@ export async function createSession(input: {
   revalidatePath('/dashboard/fotos')
   return data.id as string
 }
+
+export async function setPhotoPrice(photoId: string, price: number) {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { error } = await supabase.from('photos').update({ price })
+    .eq('id', photoId).eq('photographer_id', user.id) // authz: solo lo propio
+  if (error) throw new Error(error.message)
+  revalidatePath('/dashboard/fotos')
+}
+
+export async function setPackPrice(sessionId: string, packPrice: number) {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { error } = await supabase.from('sessions').update({ pack_price: packPrice })
+    .eq('id', sessionId).eq('photographer_id', user.id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/dashboard/fotos')
+}
