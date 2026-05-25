@@ -5,6 +5,7 @@ const valid = {
   NEXT_PUBLIC_SUPABASE_URL: 'https://x.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon',
   SUPABASE_SERVICE_ROLE_KEY: 'service',
+  JINA_API_KEY: 'jina',
 }
 
 describe('parseEnv', () => {
