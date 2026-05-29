@@ -10,6 +10,14 @@ const FILTER_GROUPS: { category: string; label: string; values: { value: string;
     { value: 'espuma', label: 'Espuma' }, { value: 'sup', label: 'SUP' }, { value: 'bodyboard', label: 'Bodyboard' },
     { value: 'bodysurf', label: 'Bodysurf' },
   ] },
+  { category: 'maneuver', label: 'Maniobra', values: [
+    { value: 'remando', label: 'Remando' }, { value: 'drop', label: 'Drop' },
+    { value: 'bottom-turn', label: 'Bottom turn' }, { value: 'cutback', label: 'Cutback' },
+    { value: 'floater', label: 'Floater' }, { value: 'aereo', label: 'Aéreo' },
+    { value: 're-entry', label: 'Re-entry' }, { value: 'tubo', label: 'Tubo' },
+    { value: 'caida', label: 'Caída' }, { value: 'caminando', label: 'Caminando' },
+    { value: 'maniobra', label: 'Maniobra' },
+  ] },
   { category: 'stance', label: 'Stance', values: [{ value: 'goofy', label: 'Goofy' }, { value: 'regular', label: 'Regular' }] },
   { category: 'sexo', label: 'Surfista', values: [{ value: 'hombre', label: 'Hombre' }, { value: 'mujer', label: 'Mujer' }] },
   { category: 'patas_de_rana', label: 'Patas de rana', values: [{ value: 'si', label: 'Con' }, { value: 'no', label: 'Sin' }] },
@@ -44,6 +52,7 @@ export function SearchBar({ beaches }: { beaches: { slug: string; name: string }
     <div className="flex w-full max-w-md flex-col gap-3 bg-canvas/95 p-4">
       <input
         value={q} onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') go() }}
         placeholder="describí tu sesión: dónde, cuándo, cómo ibas…"
         className="border-b border-ink/15 bg-transparent py-2 text-lg"
       />

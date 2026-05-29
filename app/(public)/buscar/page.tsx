@@ -8,6 +8,7 @@ import type { PhotoResult, ParsedFilters, QueryUnderstanding } from '@/lib/searc
 import { FACET_CATEGORIES, type FacetCategory } from '@/lib/facets'
 import { previewUrl, thumbUrl } from '@/lib/photos/public-url'
 import { Masonry } from '@/components/photo/masonry'
+import { SearchBar } from '@/components/search/search-bar'
 import type { RerankItem } from '@/lib/search/rerank'
 
 type Row = { id: string; price: number | null; vote_count: number; width: number | null; height: number | null; photographer_id: string; captured_at: string }
@@ -42,12 +43,12 @@ export default async function BuscarPage({
   const select = 'id, price, vote_count, width, height, photographer_id, captured_at'
   const q = raw.q?.trim() ?? ''
   const manual = parseManualFilters(raw)
+  const { data: beaches } = await supabase.from('beaches').select('slug, name')
 
   // Capa de entendimiento (con fallback robusto: si el LLM falla, va CLIP sobre el texto crudo).
   let understanding: QueryUnderstanding = { filters: {}, visualQuery: q }
   if (q) {
     try {
-      const { data: beaches } = await supabase.from('beaches').select('slug, name')
       understanding = await getUnderstander().understand(q, {
         beaches: beaches ?? [],
         today: new Date().toISOString().slice(0, 10),
@@ -86,6 +87,7 @@ export default async function BuscarPage({
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4">
+      <SearchBar beaches={beaches ?? []} />
       <p className="text-sm text-ink/60">{results.length} fotos</p>
       {results.length === 0 ? (
         <p className="py-12 text-center text-ink/50">
