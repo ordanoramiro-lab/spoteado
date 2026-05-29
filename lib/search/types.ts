@@ -1,12 +1,26 @@
-export type SearchParams = {
-  beach?: string
-  from?: string      // ISO date (yyyy-mm-dd)
+import type { FacetCategory } from '@/lib/facets'
+
+export type ParsedFilters = {
+  beach_slug?: string
+  timeBlock?: string[]
+  from?: string // ISO yyyy-mm-dd
   to?: string
-  timeBlock?: string
-  tags?: string[]
-  q?: string         // lenguaje natural
+  facets?: Partial<Record<FacetCategory, string[]>>
 }
-export type SearchPath = 'filters' | 'semantic'
+
+export type QueryUnderstanding = {
+  filters: ParsedFilters
+  visualQuery: string // texto para CLIP (color, vestimenta, apariencia)
+}
+
+export type UnderstandContext = {
+  beaches: { slug: string; name: string }[]
+  today: string // ISO yyyy-mm-dd
+}
+
+export interface QueryUnderstander {
+  understand(raw: string, ctx: UnderstandContext): Promise<QueryUnderstanding>
+}
 
 export type PhotoResult = {
   id: string
