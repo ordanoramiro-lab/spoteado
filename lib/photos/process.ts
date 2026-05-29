@@ -28,12 +28,19 @@ export async function processPhoto(deps: ProcessDeps, photo: PhotoRow): Promise<
     return
   }
 
-  // Embedding best-effort.
+  // Embedding + auto-clasificación de facetas, best-effort (no tumban el 'ready').
   try {
     const vector = await deps.embedImage(original)
     await deps.indexVector(vector)
     await deps.updatePhoto({ embedding_status: 'done' })
   } catch {
     await deps.updatePhoto({ embedding_status: 'failed' })
+  }
+
+  try {
+    const facets = await deps.classifyFacets(original)
+    await deps.indexFacets(facets)
+  } catch {
+    // clasificación best-effort: la foto queda sin facetas (null → no excluye en búsqueda)
   }
 }

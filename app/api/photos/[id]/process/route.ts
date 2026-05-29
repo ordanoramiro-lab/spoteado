@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getUser } from '@/lib/auth/dal'
 import { getEmbedder } from '@/lib/embeddings'
 import { imageDimensions, makeThumbnail, watermarkPreview } from '@/lib/images'
-import { upsertPhoto } from '@/lib/vectors'
+import { upsertPhoto, setPhotoFacetsPayload, type PhotoFacets } from '@/lib/vectors'
+import { getClassifier, applyThreshold } from '@/lib/classify'
 import { processPhoto } from '@/lib/photos/process'
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -55,10 +56,20 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
           beach_slug: beach?.slug ?? '',
           captured_at: photo.captured_at,
           time_block: photo.time_block,
-          tags: [],
+          facets: {},
           status: 'ready',
           session_id: photo.session_id,
         }),
+      classifyFacets: async (img: Buffer): Promise<PhotoFacets> =>
+        applyThreshold(await getClassifier().classify(img)),
+      indexFacets: async (facets: PhotoFacets) => {
+        // Persistir en Postgres (upsert por categoría) + sincronizar payload de Qdrant.
+        const rows = Object.entries(facets).map(([category, value]) => ({
+          photo_id: photo.id, category, value,
+        }))
+        if (rows.length) await admin.from('photo_facets').upsert(rows, { onConflict: 'photo_id,category' })
+        await setPhotoFacetsPayload(photo.id, facets)
+      },
       updatePhoto: async (patch: Record<string, unknown>) => {
         await admin.from('photos').update(patch).eq('id', id)
       },
