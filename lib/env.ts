@@ -7,6 +7,7 @@ const schema = z.object({
   JINA_API_KEY: z.string().min(1),
   QDRANT_URL: z.string().url(),
   QDRANT_API_KEY: z.string().min(1),
+  OPENAI_API_KEY: z.string().min(1),
 })
 
 export type Env = z.infer<typeof schema>

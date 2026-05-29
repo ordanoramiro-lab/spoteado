@@ -8,6 +8,7 @@ const valid = {
   JINA_API_KEY: 'jina',
   QDRANT_URL: 'https://x.qdrant.io',
   QDRANT_API_KEY: 'qdrant',
+  OPENAI_API_KEY: 'sk-test',
 }
 
 describe('parseEnv', () => {
@@ -22,5 +23,10 @@ describe('parseEnv', () => {
 
   it('tira si la URL no es válida', () => {
     expect(() => parseEnv({ ...valid, NEXT_PUBLIC_SUPABASE_URL: 'no-es-url' })).toThrow()
+  })
+
+  it('requiere OPENAI_API_KEY', () => {
+    expect(() => parseEnv({ ...valid, OPENAI_API_KEY: undefined })).toThrow()
+    expect(parseEnv(valid).OPENAI_API_KEY).toBe('sk-test')
   })
 })
