@@ -17,10 +17,12 @@ const SCHEMA = {
     timeBlock: { type: 'array', items: { type: 'string', enum: TIME_BLOCKS } },
     from: { type: ['string', 'null'] },
     to: { type: ['string', 'null'] },
-    facets: { type: 'object', additionalProperties: false, properties: FACET_PROPS, required: [] },
+    facets: { type: 'object', additionalProperties: false, properties: FACET_PROPS, required: FACET_CATEGORIES },
     visualQuery: { type: 'string' },
   },
-  required: ['visualQuery'],
+  // OpenAI strict mode exige listar TODAS las propiedades en required; los campos
+  // "opcionales" se modelan como nullable (beach_slug/from/to) o arrays vacíos (timeBlock/facets).
+  required: ['beach_slug', 'timeBlock', 'from', 'to', 'facets', 'visualQuery'],
 }
 
 function systemPrompt(ctx: UnderstandContext): string {
@@ -39,6 +41,7 @@ export class OpenAIUnderstander implements QueryUnderstander {
   async understand(raw: string, ctx: UnderstandContext): Promise<QueryUnderstanding> {
     const res = await this.client.chat.completions.create({
       model: 'gpt-4o-mini',
+      temperature: 0, // ruteo NL→filtros determinístico
       messages: [
         { role: 'system', content: systemPrompt(ctx) },
         { role: 'user', content: raw },

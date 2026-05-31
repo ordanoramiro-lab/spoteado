@@ -64,6 +64,7 @@ export class OpenAIClassifier implements Classifier {
   async classify(image: Buffer): Promise<FacetPrediction[]> {
     const res = await this.client.chat.completions.create({
       model: 'gpt-4o',
+      temperature: 0, // clasificación determinística: misma foto → misma faceta
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'user', content: [
