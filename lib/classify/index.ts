@@ -25,6 +25,7 @@ export function applyThreshold(preds: FacetPrediction[], threshold = CONFIDENCE_
 }
 
 import OpenAI from 'openai'
+import sharp from 'sharp'
 import { env } from '@/lib/env'
 
 // Prompt estático: describe el vocabulario permitido por categoría.
@@ -32,11 +33,20 @@ const VOCAB_DESC = FACET_CATEGORIES
   .map((c) => `- ${c}: ${FACET_VOCAB[c].join(', ')}`)
   .join('\n')
 
-const SYSTEM = `Sos un clasificador de fotos de surf. Mirá la imagen y, SOLO si estás seguro, \
-asigná facetas usando EXCLUSIVAMENTE estos valores:\n${VOCAB_DESC}\n\
-Reglas: una sola faceta por categoría; si dudás, NO la incluyas (confidence baja). \
-'patas_de_rana' es si/no según se vean. 'stance' es goofy (pie derecho adelante) o regular (izquierdo). \
-Devolvé un array 'facets' con {category, value, confidence} (confidence 0..1).`
+const SYSTEM = `Sos un clasificador experto de fotos de surf. Observá con MUCHA atención al surfista \
+(puede ser chico o estar lejos) y asigná facetas usando EXCLUSIVAMENTE estos valores:
+${VOCAB_DESC}
+
+Definiciones (NO confundir):
+- board_type: longboard (tabla larga >8'); tabla-corta (shortboard de performance); fish (corta y ancha, cola de golondrina); evolutiva (intermedia/funboard); gun (larga y angosta, olas grandes); espuma (softboard de escuela); sup (con remo); bodyboard (tabla CORTA de espuma, el rider va ACOSTADO de panza o de rodillas, NO parado); bodysurf (SIN tabla, solo el cuerpo).
+- patas_de_rana: aletas en los pies. Típicas de bodyboard y bodysurf. Si ves al rider acostado/de panza, casi seguro lleva patas → 'si'. Si el surfista va claramente PARADO sobre una tabla rígida y no se ven aletas → 'no' (respondé con confianza, es fácil).
+- maneuver: remando (acostado, remando, sin olla); drop (recién despegando, BAJANDO la cara de la ola al inicio); bottom-turn (giro en la base); cutback (giro de regreso hacia la espuma); floater (deslizando por ARRIBA de la espuma); aereo (en el AIRE, despegado del agua); re-entry (pegándole al labio arriba); tubo (ENVUELTO dentro del hueco de la ola, hay una cortina de agua tapándolo); caida (wipeout, perdió el control); caminando (longboard, caminando hacia la punta). IMPORTANTE: drop (bajando al inicio) NO es tubo (estar dentro del hueco cerrado).
+- stance: SOLO si se distingue claramente qué pie va adelante. goofy = pie DERECHO adelante; regular = pie IZQUIERDO adelante. Si no se ve con claridad cuál pie va adelante, NO incluyas stance.
+- sexo: hombre/mujer solo si es razonablemente claro.
+
+Reglas: una sola faceta por categoría. Respondé las facetas que veas con razonable seguridad (no te quedes corto en las fáciles como sexo o patas_de_rana=no). \
+Sé especialmente ESTRICTO con 'stance' y con 'board_type' cuando el surfista esté lejos o chico: ante la duda real, omitilos en vez de adivinar. \
+Devolvé un array 'facets' con {category, value, confidence} (confidence 0..1, reflejando cuán seguro estás).`
 
 const RESPONSE_SCHEMA = {
   type: 'object',
@@ -62,13 +72,20 @@ const RESPONSE_SCHEMA = {
 export class OpenAIClassifier implements Classifier {
   private client = new OpenAI({ apiKey: env.OPENAI_API_KEY })
   async classify(image: Buffer): Promise<FacetPrediction[]> {
+    // Normalizar a JPEG con sharp: OpenAI no acepta avif/heic/tiff y rechaza payloads enormes.
+    // Resize a 1536px (sweet spot de detail:'high') preservando suficiente detalle del surfista.
+    const jpeg = await sharp(image)
+      .rotate()
+      .resize(1536, 1536, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer()
     const res = await this.client.chat.completions.create({
       model: 'gpt-4o',
       temperature: 0, // clasificación determinística: misma foto → misma faceta
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'user', content: [
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image.toString('base64')}` } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${jpeg.toString('base64')}`, detail: 'high' } },
         ] },
       ],
       response_format: {
