@@ -44,6 +44,13 @@ describe('processPhoto', () => {
     expect(lastPatch).toMatchObject({ embedding_status: 'done' })
   })
 
+  it('embebe el THUMB, no el original (Jina rechaza imágenes grandes >~10MB)', async () => {
+    const deps = makeDeps()
+    await processPhoto(deps, photo)
+    expect(deps.embedImage).toHaveBeenCalledWith(Buffer.from('thumb'))
+    expect(deps.embedImage).not.toHaveBeenCalledWith(Buffer.from('orig'))
+  })
+
   it('si falla el embedding, queda ready pero embedding_status=failed', async () => {
     const deps = makeDeps({ embedImage: vi.fn(async () => { throw new Error('down') }) })
     await processPhoto(deps, photo)

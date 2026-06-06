@@ -29,8 +29,10 @@ export async function processPhoto(deps: ProcessDeps, photo: PhotoRow): Promise<
   }
 
   // Embedding + auto-clasificación de facetas, best-effort (no tumban el 'ready').
+  // Se embebe el THUMB, no el original: Jina rechaza imágenes grandes (>~10MB → 422).
+  // CLIP escala a baja resolución igual, así que el thumb no pierde señal relevante.
   try {
-    const vector = await deps.embedImage(original)
+    const vector = await deps.embedImage(thumb)
     await deps.indexVector(vector)
     await deps.updatePhoto({ embedding_status: 'done' })
   } catch {
