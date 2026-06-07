@@ -27,6 +27,7 @@ export function applyThreshold(preds: FacetPrediction[], threshold = CONFIDENCE_
 import OpenAI from 'openai'
 import sharp from 'sharp'
 import { env } from '@/lib/env'
+import { computeCrop, isUsableBox, type Box } from './crop'
 
 // Prompt estático: describe el vocabulario permitido por categoría.
 const VOCAB_DESC = FACET_CATEGORIES
@@ -69,23 +70,82 @@ const RESPONSE_SCHEMA = {
   required: ['facets'],
 }
 
+const LOCATE_SYSTEM = `Ubicá al SURFISTA PRINCIPAL de la foto (la persona surfeando, junto con su tabla). \
+Devolvé un bounding box que lo contenga (persona + tabla) en fracciones 0..1: \
+x,y = esquina superior izquierda; w,h = ancho y alto. \
+Si hay varios, elegí al más prominente/protagonista. Si NO hay nadie surfeando, found=false (y x,y,w,h en 0).`
+
+const BBOX_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    found: { type: 'boolean' },
+    x: { type: 'number' }, y: { type: 'number' }, w: { type: 'number' }, h: { type: 'number' },
+  },
+  required: ['found', 'x', 'y', 'w', 'h'],
+}
+
+const CLASSIFY_SIZE = 1536
+
 export class OpenAIClassifier implements Classifier {
   private client = new OpenAI({ apiKey: env.OPENAI_API_KEY })
+
+  // Paso 1: ubicar al surfista para poder recortar y "hacerle zoom". Devuelve null si no encuentra.
+  private async locate(normalized: Buffer): Promise<Box | null> {
+    try {
+      const small = await sharp(normalized).resize(768, 768, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer()
+      const res = await this.client.chat.completions.create({
+        model: 'gpt-4o',
+        temperature: 0,
+        messages: [
+          { role: 'system', content: LOCATE_SYSTEM },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${small.toString('base64')}`, detail: 'high' } },
+          ] },
+        ],
+        response_format: { type: 'json_schema', json_schema: { name: 'bbox', strict: true, schema: BBOX_SCHEMA as { [key: string]: unknown } } },
+      })
+      const c = res.choices[0]?.message?.content
+      if (!c) return null
+      const j = JSON.parse(c) as { found: boolean; x: number; y: number; w: number; h: number }
+      if (!j.found) return null
+      return { x: j.x, y: j.y, w: j.w, h: j.h }
+    } catch {
+      return null // ante cualquier falla, se clasifica la imagen completa
+    }
+  }
+
   async classify(image: Buffer): Promise<FacetPrediction[]> {
-    // Normalizar a JPEG con sharp: OpenAI no acepta avif/heic/tiff y rechaza payloads enormes.
-    // Resize a 1536px (sweet spot de detail:'high') preservando suficiente detalle del surfista.
-    const jpeg = await sharp(image)
-      .rotate()
-      .resize(1536, 1536, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer()
+    // Normalizar orientación a píxeles (aplica EXIF) para que el recorte coincida con lo que ve el modelo.
+    // OpenAI no acepta avif/heic/tiff: sharp lo deja en JPEG.
+    const normalized = await sharp(image).rotate().toBuffer()
+    const meta = await sharp(normalized).metadata()
+
+    // Paso 1: ubicar al surfista y recortar en alta resolución (zoom al sujeto chico).
+    const box = await this.locate(normalized)
+    let toClassify: Buffer
+    if (box && isUsableBox(box) && meta.width && meta.height) {
+      const c = computeCrop(meta.width, meta.height, box, 0.5)
+      toClassify = await sharp(normalized)
+        .extract({ left: c.left, top: c.top, width: c.width, height: c.height })
+        .resize(CLASSIFY_SIZE, CLASSIFY_SIZE, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer()
+    } else {
+      toClassify = await sharp(normalized)
+        .resize(CLASSIFY_SIZE, CLASSIFY_SIZE, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer()
+    }
+
+    // Paso 2: clasificar el recorte (o la foto entera) con alta resolución.
     const res = await this.client.chat.completions.create({
       model: 'gpt-4o',
       temperature: 0, // clasificación determinística: misma foto → misma faceta
       messages: [
         { role: 'system', content: SYSTEM },
         { role: 'user', content: [
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${jpeg.toString('base64')}`, detail: 'high' } },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${toClassify.toString('base64')}`, detail: 'high' } },
         ] },
       ],
       response_format: {
